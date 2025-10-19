@@ -1,0 +1,29 @@
+version: '3.8'
+services:
+  evolution:
+    image: 'atendai/evolution-api:latest'
+    container_name: evolution
+    environment:
+      - SERVICE_FQDN_EVO_8080
+      - 'SERVER_URL={SERVICE_FQDN_EVO}'
+      - DEL_INSTANCE=false
+      - DEL_TEMP_INSTANCES=false
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - 'DATABASE_CONNECTION_URI=URI INTERNAL POSTGRES' # Substituir pela URI de conexão
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution-app
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1027934701
+      - SQS_ENABLED=false
+      - WEBSOCKET_ENABLED=false
+      - WA_BUSINESS_TOKEN_WEBHOOK=evolution
+      - 'WA_BUSINESS_URL=https://graph.facebook.com'
+      - WA_BUSINESS_VERSION=v20.0
+      - WA_BUSINESS_LANGUAGE=pt_BR
+      - CACHE_REDIS_ENABLED=true
+      - 'CACHE_REDIS_URI=URI REDIS INTERNAL' # Substituir pela URI do Redis
+      - CACHE_REDIS_PREFIX_KEY=evolution-app
+      - AUTHENTICATION_API_KEY=SUASENHA # Substituir pela sua chave de autenticação
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      - LANGUAGE=pt-BR
+    ports: # Mapeamento de portas (host:container)
+      - '8081:8080'
