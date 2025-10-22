@@ -25,6 +25,7 @@ services:
       - N8N_SECURE_COOKIE=true
       - EXECUTIONS_MODE=queue
       - N8N_RUNNERS_ENABLED=true
+      - N8N_PROXY_HOPS=1
     volumes: # Mapeamento de volume persistente
       - 'n8n-data:/home/node/.n8n' 
     healthcheck: # Configuração de verificação de saúde
@@ -36,4 +37,4 @@ services:
       retries: 10
 networks: # Definição da rede 'coolify'
   coolify:
-    driver: bridge
+    driver: bridge  
