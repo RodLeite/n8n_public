@@ -1,33 +1,46 @@
 services:
-  n8n-worker: # Recomenda-se um nome de serviço diferente do 'main'
-    image: 'n8nio/n8n:latest'
+  n8n:
+    image: 'n8nio/n8n:1.115.2'
     networks:
       - coolify
-    command: worker # Define o container para rodar como 'worker'
+    # CRÍTICO: Define o propósito deste contêiner
+    command: worker 
     environment:
-      - SERVICE_FQDN_N8N_5678
-      - 'N8N_EDITOR_BASE_URL=${SERVICE_FQDN_N8N}'
-      - 'WEBHOOK_URL=${SERVICE_FQDN_N8N}'
-      - 'N8N_HOST=${SERVICE_URL_N8N}'
+      # REMOVIDO: SERVICE_FQDN_N8N_5678 (Não é necessário para o worker)
+      # REMOVIDO: 'N8N_EDITOR_BASE_URL=${SERVICE_FQDN_N8N}' (Worker não hospeda a UI)
+      # REMOVIDO: 'WEBHOOK_URL=${SERVICE_FQDN_N8N}' (Worker não gerencia webhooks)
+      # REMOVIDO: 'N8N_HOST=${SERVICE_URL_N8N}' (Não é necessário para o worker)
+      
+      # --- Variáveis de Fuso Horário ---
       - GENERIC_TIMEZONE=America/Sao_Paulo
       - TZ=America/Sao_Paulo
+      
+      # --- Variáveis de Banco de Dados ---
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_PORT=5432
       - 'DB_POSTGRESDB_HOST=${POSTGRES_CONTAINER_NAME}'
       - DB_POSTGRESDB_DATABASE=n8n
       - DB_POSTGRESDB_USER=postgres
       - 'DB_POSTGRESDB_PASSWORD=${POSTGRES_PW}'
-      - N8N_ENCRYPTION_KEY=SUAENCRYTIONKEY # Apos gerar sua chave do n8n-main cole aqui (MAIN E WORKER PRECISAM SER IGUAIS)
+      - N8N_ENCRYPTION_KEY=YOURENCRYPTIONKEY # -- TROCAR POR KEY 256 bytes
+      
+      # --- Variáveis de Fila (Redis) ---
       - 'QUEUE_BULL_REDIS_HOST=${REDIS_CONTAINER_NAME}'
       - 'QUEUE_BULL_REDIS_PASSWORD=${REDIS_PW}'
       - QUEUE_BULL_REDIS_PORT=6379
       - QUEUE_BULL_REDIS_DB=2
+      
+      # --- Variáveis de Execução ---
+      - EXECUTIONS_MODE=queue
+      # REMOVIDO: N8N_RUNNERS_ENABLED=true (O comando 'worker' já faz isso)
+      
+      # --- Variáveis de Segurança ---
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
       - N8N_SECURE_COOKIE=true
-      - EXECUTIONS_MODE=queue
-      - N8N_RUNNERS_ENABLED=true
+      
     volumes:
       - 'n8n-data:/home/node/.n8n'
+    # O Healthcheck pode ser simplificado, mas o seu atual está ok para o worker escutar na porta 5678
     healthcheck:
       test:
         - CMD-SHELL
@@ -35,7 +48,6 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-
 networks:
   coolify:
     driver: bridge
