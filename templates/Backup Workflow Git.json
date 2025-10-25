@@ -1,0 +1,727 @@
+{
+  "name": "0.0 - Backup Workflows",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1360,
+        320
+      ],
+      "id": "f2edb909-c9fe-467b-b222-479e5e7877bd",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "formatDate",
+        "date": "={{ $now }}",
+        "format": "custom",
+        "customFormat": "dd-MM-yyyy/H:mm",
+        "options": {}
+      },
+      "id": "25028e99-18d1-44c0-9a21-8aa1a6f8e684",
+      "name": "Format date",
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        -1184,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "filters": {},
+        "requestOptions": {}
+      },
+      "id": "40d296d5-5c37-4dcc-8c71-0f6bef69b3ab",
+      "name": "Retrieve Workflows (n8n)",
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        320
+      ],
+      "credentials": {
+        "n8nApi": {
+          "id": "<REMOVED_N8N_API_CRED_ID>",
+          "name": "<REMOVED>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ba55efc1-ac08-4afb-b7ee-ff2d6d019bb9",
+              "name": "=id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "257485ad-3600-4ff5-8590-640230fbe11b",
+              "name": "name",
+              "value": "={{ $json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "ca342bf7-c170-4a73-8128-64836b3833d7",
+              "name": "workflowJson",
+              "value": "={{ JSON.stringify($json) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -816,
+        320
+      ],
+      "id": "a3c19682-a65e-42d2-a920-ec423b7aad0a",
+      "name": "Set workflow JSON"
+    },
+    {
+      "parameters": {
+        "type": "SHA256",
+        "value": "={{ $json.workflowJson }}",
+        "dataPropertyName": "SHA256"
+      },
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        320
+      ],
+      "id": "7ce967ff-77a5-45b2-bb85-a5a6f5cc7093",
+      "name": "Generate SHA-256 Hash"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COALESCE(c.workflow_id, 'undefined') AS workflow_id,\n  COALESCE(c.last_hash, 'undefined')   AS last_hash\nFROM (\n  SELECT '{{ $(\"Set workflow JSON\").item.json.id }}' AS workflow_id\n) AS input\nLEFT JOIN strixfy.workflow_state c\n  ON c.workflow_id = input.workflow_id\nLIMIT 1;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -464,
+        320
+      ],
+      "id": "69c67513-768e-4af7-9062-5852825eea8c",
+      "name": "Has this workflow already been created?",
+      "credentials": {
+        "postgres": {
+          "id": "<REMOVED_POSTGRES_CRED_ID>",
+          "name": "<REMOVED>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1790644-e4c6-4db9-be20-8a3582cd8ef3",
+              "leftValue": "={{ $json.workflow_id }}",
+              "rightValue": "undefined",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        320
+      ],
+      "id": "3d4bb007-225f-426f-839f-c1a3d7128651",
+      "name": "Check Previous SHA"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "value": "strixfy",
+          "mode": "list",
+          "cachedResultName": "strixfy"
+        },
+        "table": {
+          "__rl": true,
+          "value": "workflow_state",
+          "mode": "list",
+          "cachedResultName": "workflow_state"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow_id": "={{ $('Generate SHA-256 Hash').item.json.id }}",
+            "workflow_name": "={{ $('Generate SHA-256 Hash').item.json.name }}",
+            "last_hash": "={{ $('Generate SHA-256 Hash').item.json.SHA256 }}",
+            "last_updated_at": "={{ $now }}"
+          },
+          "matchingColumns": [
+            "workflow_id"
+          ],
+          "schema": [
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_hash",
+              "displayName": "last_hash",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_updated_at",
+              "displayName": "last_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -80,
+        112
+      ],
+      "id": "193e922e-0541-4f84-b0d7-101efb7d6148",
+      "name": "Insert Workflow into Table",
+      "credentials": {
+        "postgres": {
+          "id": "<REMOVED_POSTGRES_CRED_ID>",
+          "name": "<REMOVED>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "workflowId": {
+          "__rl": true,
+          "value": "={{ $json.workflow_id }}",
+          "mode": "id"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        320,
+        320
+      ],
+      "id": "8be79c27-2b78-4f38-b917-f14b41103749",
+      "name": "Get Changed Workflows to Update",
+      "credentials": {
+        "n8nApi": {
+          "id": "<REMOVED_N8N_API_CRED_ID>",
+          "name": "<REMOVED>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "binaryPropertyName": "=data.new",
+        "options": {
+          "fileName": "={{ $json.name.replace(/\\s+/g, '-').toLowerCase() }}-{{ $json.id }}.json"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        320
+      ],
+      "id": "555e6491-d189-4232-b4f2-e8c45f5f8a9f",
+      "name": "Convert JSON to binary Update"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "operation": "edit",
+        "owner": {
+          "__rl": true,
+          "value": "<REMOVED_OWNER_URL>",
+          "mode": "url"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "n8n",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "<REMOVED_URL>"
+        },
+        "filePath": "={{ $('Convert JSON to binary Update').item.binary['data.new'].fileName }}",
+        "binaryData": true,
+        "binaryPropertyName": "data.new",
+        "commitMessage": "={{ \"backup-\" + $('Get Changed Workflows to Update').item.json.name + \"-\" + $item(0).$node[\"Format date\"].json.formattedDate }}"
+      },
+      "id": "fe95206b-a942-4e7a-bf15-aa3fc07af1d5",
+      "name": "Update file [GITHUB]",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        784,
+        320
+      ],
+      "webhookId": "<REMOVED_WEBHOOK_ID>",
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "<REMOVED_GITHUB_CREDENTIAL_ID>",
+          "name": "<REMOVED>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "workflowId": {
+          "__rl": true,
+          "value": "={{ $json.workflow_id }}",
+          "mode": "id"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        112,
+        112
+      ],
+      "id": "51768f66-939a-41b1-829f-d136f78dcafb",
+      "name": "Get Changed Workflows to Upload",
+      "credentials": {
+        "n8nApi": {
+          "id": "<REMOVED_N8N_API_CRED_ID>",
+          "name": "<REMOVED>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "binaryPropertyName": "=data.new",
+        "options": {
+          "fileName": "={{ $json.name.replace(/\\s+/g, '-').toLowerCase() }}-{{ $json.id }}.json"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        112
+      ],
+      "id": "ab25ab22-5116-4cb3-a880-0777ef133e1a",
+      "name": "Convert JSON to binary Upload"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "file",
+        "owner": {
+          "__rl": true,
+          "value": "<REMOVED_OWNER_URL>",
+          "mode": "url"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "n8n",
+          "mode": "list",
+          "cachedResultName": "n8n",
+          "cachedResultUrl": "<REMOVED_URL>"
+        },
+        "filePath": "={{ $('Convert JSON to binary Upload').item.binary['data.new'].fileName }}",
+        "binaryData": true,
+        "binaryPropertyName": "data.new",
+        "commitMessage": "={{ \"backup-\" + $('Get Changed Workflows to Upload').item.json.name + \"-\" + $item(0).$node[\"Format date\"].json.formattedDate }}"
+      },
+      "id": "c3412b80-dffd-47ae-81cb-ab9709ff1c0e",
+      "name": "Upload file [GITHUB]1",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        544,
+        112
+      ],
+      "webhookId": "<REMOVED_WEBHOOK_ID>",
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "<REMOVED_GITHUB_CREDENTIAL_ID>",
+          "name": "<REMOVED>"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "244ab920-0b9e-45cc-8b24-946deea3b772",
+              "leftValue": "={{ $('Generate SHA-256 Hash').item.json.id }}",
+              "rightValue": "={{ $('Has this workflow already been created?').item.json.workflow_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "65cdeaf7-4c6b-4a88-95d5-1365dfff0b2a",
+              "leftValue": "={{ $('Generate SHA-256 Hash').item.json.SHA256 }}",
+              "rightValue": "={{ $('Has this workflow already been created?').item.json.last_hash }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        416
+      ],
+      "id": "d802fcba-1c8f-4550-846e-743db0e0a387",
+      "name": "Check if Workflow Changed"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "value": "strixfy",
+          "mode": "list",
+          "cachedResultName": "strixfy"
+        },
+        "table": {
+          "__rl": true,
+          "value": "workflow_state",
+          "mode": "list",
+          "cachedResultName": "workflow_state"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow_id": "={{ $('Generate SHA-256 Hash').item.json.id }}",
+            "workflow_name": "={{ $('Generate SHA-256 Hash').item.json.name }}",
+            "last_hash": "={{ $('Generate SHA-256 Hash').item.json.SHA256 }}",
+            "last_updated_at": "={{ $now }}"
+          },
+          "matchingColumns": [
+            "workflow_id"
+          ],
+          "schema": [
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow_name",
+              "displayName": "workflow_name",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_hash",
+              "displayName": "last_hash",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_updated_at",
+              "displayName": "last_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        112,
+        320
+      ],
+      "id": "d6899b8f-b1f4-455e-be43-3d1e8b6576c6",
+      "name": "Update Workflow into Table",
+      "credentials": {
+        "postgres": {
+          "id": "<REMOVED_POSTGRES_CRED_ID>",
+          "name": "<REMOVED>"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        112,
+        496
+      ],
+      "id": "2c88d6e4-1470-4cc6-b577-06969042941a",
+      "name": "No Operation, do nothing"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format date": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Workflows (n8n)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Workflows (n8n)": {
+      "main": [
+        [
+          {
+            "node": "Set workflow JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set workflow JSON": {
+      "main": [
+        [
+          {
+            "node": "Generate SHA-256 Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate SHA-256 Hash": {
+      "main": [
+        [
+          {
+            "node": "Has this workflow already been created?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has this workflow already been created?": {
+      "main": [
+        [
+          {
+            "node": "Check Previous SHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Previous SHA": {
+      "main": [
+        [
+          {
+            "node": "Insert Workflow into Table",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check if Workflow Changed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Workflow into Table": {
+      "main": [
+        [
+          {
+            "node": "Get Changed Workflows to Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Changed Workflows to Upload": {
+      "main": [
+        [
+          {
+            "node": "Convert JSON to binary Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert JSON to binary Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload file [GITHUB]1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Workflow Changed": {
+      "main": [
+        [
+          {
+            "node": "Update Workflow into Table",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Workflow into Table": {
+      "main": [
+        [
+          {
+            "node": "Get Changed Workflows to Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Changed Workflows to Update": {
+      "main": [
+        [
+          {
+            "node": "Convert JSON to binary Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert JSON to binary Update": {
+      "main": [
+        [
+          {
+            "node": "Update file [GITHUB]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "<REMOVED_VERSION_ID>",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "<REMOVED>"
+  },
+  "id": "80ixcZbGtAdOqy9O",
+  "tags": []
+}
